@@ -43,6 +43,8 @@ jobs:
 
       - name: Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          license-accepted: true
 
       - name: Gradle 8.9
         uses: gradle/actions/setup-gradle@v5
