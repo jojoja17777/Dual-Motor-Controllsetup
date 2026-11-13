@@ -1,0 +1,60 @@
+name: APK bauen
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code holen
+        uses: actions/checkout@v6
+
+      - name: Projekt suchen (Ordner oder ZIP-Datei, egal wo im Repository)
+        run: |
+          echo "Dateien im Repository:"
+          find . -path ./.git -prune -o -type f -print | head -50
+          S=$(find . -path ./.git -prune -o -name settings.gradle -print | head -1)
+          if [ -z "$S" ]; then
+            Z=$(find . -path ./.git -prune -o -name '*.zip' -print | head -1)
+            if [ -z "$Z" ]; then
+              echo "FEHLER: Weder settings.gradle noch eine ZIP-Datei im Repository gefunden."
+              echo "Bitte die ZIP-Datei oder den entpackten Projektordner hochladen."
+              exit 1
+            fi
+            echo "Entpacke $Z"
+            mkdir -p /tmp/proj
+            unzip -q -o "$Z" -d /tmp/proj
+            S=$(find /tmp/proj -name settings.gradle | head -1)
+            if [ -z "$S" ]; then
+              echo "FEHLER: In der ZIP-Datei wurde kein Android-Projekt (settings.gradle) gefunden."
+              exit 1
+            fi
+          fi
+          echo "Projekt gefunden: $S"
+          echo "PROJECT_DIR=$(dirname "$S")" >> "$GITHUB_ENV"
+
+      - name: Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Gradle 8.9
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: '8.9'
+
+      - name: APK bauen
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: gradle assembleDebug --stacktrace
+
+      - name: APK bereitstellen
+        uses: actions/upload-artifact@v6
+        with:
+          name: Motor-Steuerung-APK
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
